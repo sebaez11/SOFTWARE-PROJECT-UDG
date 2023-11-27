@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container">
+    <h2>Lista de Compras</h2>
+
+    <form method="GET" action="{% url 'lista_compras' %}" class="mb-3">
+      <label for="filtro_compra">Filtrar por ID de Compra:</label>
+      <input type="number" name="filtro_compra" id="filtro_compra" class="form-control">
+      <button type="submit" class="btn btn-primary mt-2">Filtrar</button>
+    </form>
+
+    <a href="{% url 'crear_compra' %}" class="btn btn-primary mb-3">Crear Compra</a>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Folio de Compra</th>
+          <th>Fecha</th>
+          <th>Productos</th>
+          <th>Subtotal (MXN)</th>
+          <th>Total Costo (MXN) - IVA incluído</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for compra in compras %}
+          <tr>
+            <td>{{ compra.id }}</td>
+            <td>{{ compra.fecha }}</td>
+            <td>
+              {% for compraproducto in compra.compraproducto_set.all %}
+                {{ compraproducto.producto.nombre }} ({{ compraproducto.cantidad }} unidades a {{ compraproducto.precio }} MXN por unidad) <br>
+              {% endfor %}
+            </td>
+
+            <td>{{ compra.subtotal_compra|floatformat:2 }}</td>
+            <td>{{ compra.total_compra|floatformat:2 }}</td>
+            <td>{{compra.status}}</td>
+            <td>
+              <a href="{% url 'cambiar_estado_compra' compra.id %}?estado=entregado" class="btn btn-primary btn-sm">Marcar como Entregado</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

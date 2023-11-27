@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container">
+    <h2>Lista de Ventas</h2>
+
+    <form method="GET" action="{% url 'lista_ventas' %}" class="mb-3">
+      <label for="filtro_venta">Filtrar por ID de Venta:</label>
+      <input type="number" name="filtro_venta" id="filtro_venta" class="form-control">
+      <button type="submit" class="btn btn-primary mt-2">Filtrar</button>
+    </form>
+
+    <a href="{% url 'crear_venta' %}" class="btn btn-primary mb-3">Crear Venta</a>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Folio de Venta</th>
+          <th>Fecha</th>
+          <th>Paciente</th>
+          <th>Productos</th>
+          <th>Subtotal (MXN)</th>
+          <th>Total Costo (MXN) - IVA incluído</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for venta in ventas %}
+          <tr>
+            <td>{{ venta.id }}</td>
+            <td>{{ venta.fecha }}</td>
+            <td>{{ venta.paciente.nombre }}</td>
+            <td>
+              {% for ventaproducto in venta.ventaproducto_set.all %}
+                {{ ventaproducto.producto.nombre }} ({{ ventaproducto.cantidad }} unidades a {{ ventaproducto.precio|floatformat:2 }} MXN por unidad) <br>
+              {% endfor %}
+            </td>
+            <td>{{ venta.subtotal_venta|floatformat:2 }}</td>
+            <td>{{ venta.total_venta|floatformat:2 }}</td>
+          </tr>
+        {% endfor %}
+
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="container">
+    <h2>Registrar Venta</h2>
+    <form method="post" id="form-venta">
+      {% csrf_token %}
+
+      <div class="form-group">
+        <label for="id_fecha">Fecha:</label>
+        {{ metadata.fecha_venta }}
+      </div>
+      <div class="form-group">
+        <label for="id_folio">Número de Folio:</label>
+        {{ metadata.folio_venta }}
+      </div>
+
+      
+
+      <div class="form-group">
+        <label for="id_paciente">Paciente:</label>
+        <input list="pacientes" name="paciente_nombre" class="form-select">
+        <datalist id="pacientes">
+            {% for paciente in pacientes %}
+                <option value="{{ paciente.nombre }}">
+            {% endfor %}
+        </datalist>
+      </div>
+
+      <div class="form-group">
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#agregarProductoModal">
+          Agregar Producto
+        </button>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-8"></div> <!-- Espacio en blanco -->
+        <div class="col-md-4 text-right">
+          <strong>Subtotal: $<span id="subtotal">0.00</span></strong>
+        </div>
+      </div>
+
+      <div class="row mb-3">
+        <div class="col-md-8"></div> <!-- Espacio en blanco -->
+        <div class="col-md-4 text-right">
+          {% with porcentaje_iva=metadata.ultimo_iva %}
+            <strong>IVA ({{ porcentaje_iva }}%): $<span id="iva">0.00</span></strong><br>
+            <strong>Total con IVA: $<span id="total_con_iva">0.00</span></strong>
+          {% endwith %}
+        </div>
+      </div>
+
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Cantidad</th>
+            <th>Precio Unitario</th>
+            <th>Importe</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="productos-table-body">
+          <!-- Aquí se mostrarán los productos seleccionados -->
+        </tbody>
+      </table>
+
+      <button type="submit" class="btn btn-success">Guardar Venta</button>
+
+      <input type="hidden" name="selected_productos" id="selected_productos" />
+    </form>
+    
+  </div>
+
+  <!-- Agregar Producto Modal -->
+  <div class="modal fade" id="agregarProductoModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="exampleModalLabel">Agregar Producto</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <label for="producto-id-filtro">Filtrar por ID:</label>
+          <input type="number" id="producto-id-filtro" class="form-control">
+          <button type="button" class="btn btn-primary" onclick="filtrarProductosPorId()">Filtrar</button>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Producto</th>
+                <th>Stock</th>
+                <th>Stock mínimo</th>
+                <th>Stock máximo</th>
+                <th>Precio (MXN)</th>
+                <th>Cantidad a comprar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for producto in productos %}
+                <tr id="producto-fila-{{ producto.id }}" data-producto-id="{{ producto.id }}">
+                  <td>{{producto.id}}</td>
+                  <td id="producto-nombre-{{ producto.id }}">{{ producto.nombre }}</td>
+                  <td id="producto-stock-{{ producto.id }}">{{ producto.stock }}</td>
+                  <td>{{ producto.stock_minimo }}</td>
+                  <td>{{ producto.stock_maximo }}</td>
+                  <td id="producto-precio-{{producto.id}}">{{ producto.precio }}</td>
+                  <td><input type="number" min=0 max="{{producto.stock}}" class="form-control" id="cantidad-{{ producto.id }}"></td>
+                  <td>
+                    <button type="button" class="btn btn-primary" onclick="agregarProducto({{ producto.id }})">Agregar</button>
+                  </td>
+                </tr>
+              {% endfor %}
+
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    var selectedProductos = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      cargarProductosLocalStorage();
+
+      var form = document.getElementById('form-venta');
+
+      form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        form.submit();
+
+        localStorage.removeItem('selectedProductos');
+        selectedProductos = [];
+        document.getElementById("selected_productos").value = ""; // Limpiar el campo hidden
+        actualizarTablaProductos();
+        }
+      )
+    });
+
+    function filtrarProductosPorId() {
+      var filtroId = document.getElementById("producto-id-filtro").value;
+      var productos = document.querySelectorAll('[data-producto-id]');
+    
+      console.log("Filtro ID:", filtroId);
+    
+      productos.forEach(function (producto) {
+        var productoId = producto.dataset.productoId;
+        console.log("Producto ID:", productoId);
+        
+        var fila = document.getElementById('producto-fila-' + productoId);
+    
+        if (productoId === filtroId) {
+          fila.style.display = 'table-row';
+        } else {
+          fila.style.display = 'none';
+        }
+      });
+    }
+
+    function agregarProducto(productoId) {
+      var cantidadInput = document.getElementById("cantidad-" + productoId);
+      var cantidad = parseInt(cantidadInput.value); // Asegurarse de que la cantidad es un número.
+      console.log(cantidad);
+
+      //var stockProducto = parseInt(document.querySelector(`#stock-${productoId}`).textContent);
+      var stockProductoInput = document.getElementById("producto-stock-" + productoId);
+      var stockProducto = parseInt(stockProductoInput.textContent);
+
+      var priceProductoInput = document.getElementById("producto-precio-" + productoId);
+      var priceProducto = parseInt(priceProductoInput.textContent);
+
+      console.log("stock del producto: " + stockProducto);
+
+
+      if (cantidad > 0 && cantidad <= stockProducto) {
+        // Verificar si el producto ya está en la lista.
+        var productoExistenteIndex = selectedProductos.findIndex(p => p.id === productoId);
+        
+        if (productoExistenteIndex !== -1) {
+          // Si el producto ya existe, actualiza la cantidad.
+          selectedProductos[productoExistenteIndex].cantidad += cantidad;
+        } else {
+          // Si el producto no existe, lo agrega a la lista.
+          var nombreProducto = document.querySelector(`#producto-nombre-${productoId}`).textContent; // Asegurarse de que existe este elemento en tu HTML.
+          var producto = {
+            id: productoId,
+            cantidad: cantidad,
+            nombre: nombreProducto,
+            precio: priceProducto// Agregar el nombre del producto si es necesario.
+          };
+      
+          selectedProductos.push(producto);
+        }
+    
+        guardarProductosLocalStorage();
+        cantidadInput.value = "";
+        actualizarTablaProductos();
+      } else {
+          alert("Cantidad incorrecta.");
+      }
+    }
+    
+
+    function guardarProductosLocalStorage() {
+      localStorage.setItem('selectedProductos', JSON.stringify(selectedProductos));
+      document.getElementById("selected_productos").value = JSON.stringify(selectedProductos);
+    }
+    
+
+    function cargarProductosLocalStorage() {
+      if (localStorage.getItem('selectedProductos')) {
+        selectedProductos = JSON.parse(localStorage.getItem('selectedProductos'));
+        actualizarTablaProductos();
+      }
+    }
+  
+    function eliminarProducto(index) {
+      selectedProductos.splice(index, 1);
+      guardarProductosLocalStorage();
+      actualizarTablaProductos();
+    }
+
+
+    function actualizarTablaProductos() {
+
+      var metadata = {
+        folio_venta: "{{ metadata.folio_venta|safe }}",
+        fecha_venta: "{{ metadata.fecha_venta|safe }}",
+        ultimo_iva: parseFloat("{{ metadata.ultimo_iva|safe }}"),
+        // Agrega aquí cualquier otro dato que necesites
+      };
+
+      console.log(metadata);
+      var productosTableBody = document.getElementById("productos-table-body");
+      productosTableBody.innerHTML = "";
+
+      var subtotal = 0;
+    
+      for (var i = 0; i < selectedProductos.length; i++) {
+        var producto = selectedProductos[i];
+        var importe = producto.cantidad * producto.precio;
+        subtotal += importe; 
+    
+        var row = document.createElement("tr");
+        row.innerHTML = `
+          <td>
+            <input type="hidden" name="productos" value="${producto.id}" />
+            ${producto.nombre}
+          </td>
+          <td>${producto.cantidad}</td>
+          <td>${producto.precio}</td>
+          <td>${importe}</td>
+          <td>
+            <button type="button" class="btn btn-warning" onclick="editarProducto(${i})">Editar</button>
+            <button type="button" class="btn btn-danger" onclick="eliminarProducto(${i})">Eliminar</button>
+          </td>
+        `;
+        
+        productosTableBody.appendChild(row);
+      }
+
+      var porcentajeIva = metadata.ultimo_iva;
+      var montoIva = subtotal * (porcentajeIva / 100);
+      var totalConIva = subtotal + montoIva;
+
+      console.log("Subtotal:", subtotal);
+      console.log("IVA:", montoIva);
+      console.log("Total con IVA:", totalConIva);
+
+
+      var subtotalElement = document.getElementById("subtotal");
+      var ivaElement = document.getElementById("iva");
+      var totalConIvaElement = document.getElementById("total_con_iva");
+
+      console.log("Subtotal Element:", subtotalElement);
+      console.log("IVA Element:", ivaElement);
+      console.log("Total con IVA Element:", totalConIvaElement);
+
+      subtotalElement.textContent = subtotal.toFixed(2);
+      ivaElement.textContent = montoIva.toFixed(2);
+      totalConIvaElement.textContent = totalConIva.toFixed(2);
+
+    }
+    
+
+    function editarProducto(index) {
+      var cantidad = selectedProductos[index].cantidad;
+      var nuevaCantidad = prompt("Editar cantidad:", cantidad);
+      
+      if (nuevaCantidad !== null) {
+        nuevaCantidad = parseInt(nuevaCantidad);
+
+        if (!isNaN(nuevaCantidad) && nuevaCantidad > 0) {
+          selectedProductos[index].cantidad = nuevaCantidad;
+          actualizarTablaProductos();
+        }
+      }
+    }
+
+      
+  
+  </script>
+{% endblock %}
